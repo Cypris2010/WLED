@@ -234,6 +234,13 @@ void BusDigital::applyBriLimit(uint8_t newBri) {
       uint32_t c = PolyBus::getPixelColor(_busPtr, _iType, i, co); // Note: if ABL would be calculated as a seperate loop (as it was before) it is slower but could use original color, making it more color-accurate
       if (hasCCT()) {
         uint8_t cctWW, cctCW;
+        if (_rawWWCW && i >= _skip) { // fork: raw WW/CW from DMX, map hardware index back to bus pixel
+          unsigned p = i - _skip;
+          if (_reversed) p = _len - p - 1;
+          const uint16_t raw = _rawWWCW[_start + p];
+          cctWW = ((raw & 0xFF) * _bri) / 255;
+          cctCW = ((raw >> 8) * _bri) / 255;
+        } else
         Bus::calculateCCT(c, cctWW, cctCW); // calculate CCT before fade (more accurate) | Note: if using "accurate" white calculation mode, approximateKelvinFromRGB can be very inaccurate (white is subtracted)
         wwcw = ((cctCW + 1) * newBri) & 0xFF00; // apply brightness to CCT (leave it in upper byte for 16bit NeoPixelBus value)
         wwcw |= ((cctWW + 1) * newBri) >> 8;
@@ -273,6 +280,12 @@ void IRAM_ATTR BusDigital::setPixelColor(unsigned pix, uint32_t c) {
   uint8_t cctWW = 0, cctCW = 0;
   uint16_t wwcw = 0;
   if (hasWhite()) c = autoWhiteCalc(c, cctWW, cctCW);
+  if (_rawWWCW && hasCCT()) { // fork: WW/CW come directly from DMX, bypassing CCT calculation
+    const uint16_t raw = _rawWWCW[_start + pix];
+    cctWW = raw & 0xFF;
+    cctCW = raw >> 8;
+    c = RGBW32(R(c), G(c), B(c), std::min(255, cctWW + cctCW)); // W is only used for the ABL estimate
+  }
   c = color_fade(c, _bri, true); // apply brightness
 
   if (hasCCT()) {
@@ -360,7 +373,7 @@ std::vector<LEDType> BusDigital::getLEDTypes() {
     {TYPE_SK6812_RGBW,   "D",  PSTR("SK6812/WS2814 RGBW")},
     {TYPE_UCS8904,       "D",  PSTR("UCS8904 RGBW")},
     {TYPE_TM1814,        "D",  PSTR("TM1814 RGBW")},
-    {TYPE_FW1906,        "D",  PSTR("FW1906/WS2811 RGBCCT")},
+    {TYPE_FW1906,        "D",  PSTR("Govee H7063 (CW WW x + GRB)")},
     {TYPE_WS2805,        "D",  PSTR("WS2805 RGBCCT")},
     {TYPE_SM16825,       "D",  PSTR("SM16825 RGBCCT")},
     {TYPE_WS2812_1CH_X3, "D",  PSTR("WS2811 White")},
@@ -1537,6 +1550,7 @@ uint8_t PolyBus::_2PchannelsAssigned = 0;
 // Bus static member definition
 int16_t Bus::_cct = -1;     // -1 means use approximateKelvinFromRGB(), 0-255 is standard, >1900 use colorBalanceFromKelvin()
 int8_t  Bus::_cctBlend = 0; // -128 to +127
+const uint16_t* Bus::_rawWWCW = nullptr; // fork: raw WW/CW per pixel (see DMX_MODE_MULTIPLE_RGBWWCW)
 uint8_t Bus::_gAWM = 255;
 
 uint16_t BusDigital::_milliAmpsTotal = 0;

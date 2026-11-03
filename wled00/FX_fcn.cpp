@@ -1707,6 +1707,7 @@ void WS2812FX::show() {
 
   // paint actual pixels
   int oldCCT = Bus::getCCT(); // store original CCT value (since it is global)
+  Bus::setRawWWCW(getDmxRawWWCW()); // fork: raw WW/CW from DMX (nullptr unless DMX_MODE_MULTIPLE_RGBWWCW is live)
   // when cctFromRgb is true we implicitly calculate WW and CW from RGB values (cct==-1)
   if (cctFromRgb) BusManager::setSegmentCCT(-1);
   // use color gamma correction if enabled, not in realtime mode with gamma disabled or currently overriding RT mode
@@ -1733,6 +1734,7 @@ void WS2812FX::show() {
   // all of the data has been sent.
   // See https://github.com/Makuna/NeoPixelBus/wiki/ESP32-NeoMethods#neoesp32rmt-methods
   BusManager::show();
+  Bus::setRawWWCW(nullptr); // fork: applyBriLimit() in BusManager::show() still needs the raw values
 
   if (diff > 0) { // skip calculation if no time has passed
     size_t fpsCurr = (1000 << FPS_CALC_SHIFT) / diff; // fixed point math

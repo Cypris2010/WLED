@@ -203,6 +203,8 @@ class Bus {
     static inline void     setGlobalAWMode(uint8_t m) { if (m < 5) _gAWM = m; else _gAWM = AW_GLOBAL_DISABLED; }
     static inline uint8_t  getGlobalAWMode()          { return _gAWM; }
     static inline void     setCCT(int16_t cct)        { _cct = cct; }
+    // fork: per-pixel raw WW (low byte) / CW (high byte) values, indexed by global pixel index; nullptr = use CCT calculation
+    static inline void     setRawWWCW(const uint16_t* raw) { _rawWWCW = raw; }
     static inline int8_t   getCCTBlend()              { return (_cctBlend * 100 + (_cctBlend >= 0 ? 64 : -64)) / 127; } // returns -100 to +100, +/-100% = +/-127. +/-64 for rounding 
     static inline void     setCCTBlend(int8_t b) {    // input is -100 to +100
       _cctBlend = (std::max(-100, std::min(100, (int)b)) * 127 + (b >= 0 ? 50 : -50)) / 100; // +/-50 for rounding, b=+/-100% -> +/-127
@@ -240,6 +242,7 @@ class Bus {
     //   63 - semi additive/nonlinear (CCT 127 => 66% warm, 66% cold)
     //  127 - additive CCT blending (CCT 127 => 100% warm, 100% cold)
     static int8_t _cctBlend;
+    static const uint16_t* _rawWWCW;
 
     uint32_t autoWhiteCalc(uint32_t c, uint8_t &ww, uint8_t &cw) const;
 };
